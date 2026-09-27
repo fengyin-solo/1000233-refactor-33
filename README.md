@@ -45,6 +45,28 @@ npm run dev
 前端默认监听 `http://127.0.0.1:5173/`，dev server 不会自动打开浏览器，
 需要自己访问。`/api` 由 vite 代理到后端 `http://127.0.0.1:8000`。
 
+## 定期检修种子：生成与检查
+
+定期检修的种子数据拆成两个可独立重跑的阶段，互不依赖：
+
+```bash
+make seed-maintenance   # 生成阶段（应用停着也能跑，可反复执行）
+make backend            # 启动后端
+make check-maintenance  # 检查阶段（全程只读，可反复执行）
+```
+
+- **生成阶段**：脚本 `backend/scripts/generate_maintenance_seed.py`
+  只读取 `backend/data/maintenance_plan_input.csv` 的「设备名称、检修级别、计划日期」
+  三列，计划编号由这三列确定性生成；遇到已存在的计划编号（内置种子或
+  已生成文件里有）直接跳过，产出 `backend/data/maintenance.generated.json`，
+  后端启动时会合并这份数据（同样按计划编号去重）。
+- **检查阶段**：脚本 `backend/scripts/check_maintenance.py`
+  先确认服务依赖（fastapi / uvicorn / pydantic）和本地进程状态（端口监听 +
+  `/api/health`），再用只读探针（GET）调用 `/api/maintenance` 检修查询，
+  比对脚本（种子文件）、数据库（内存仓库）、应用（运行中的接口）三方的
+  计划编号是否完全一致；不一致时以非零码退出并给出差异。生成新数据后
+  接口仍旧，通常是后端启动在生成之前，重启后端再检查即可。
+
 ## 业务模块
 
 | 模块 | 目录 | 业务对象 | 主要字段 |

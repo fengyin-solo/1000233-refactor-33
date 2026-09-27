@@ -85,3 +85,4 @@ desktop.ini
 *.db
 *.pid
 *.seed
+backend/data/maintenance.generated.json
