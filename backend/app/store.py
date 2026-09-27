@@ -1,12 +1,18 @@
 """内存数据仓库：给每个业务模块准备一份可筛选、可流转的示例数据。
 
 真实项目里这里会换成数据库访问层；当前实现只依赖标准库，保证克隆下来就能起。
+定期检修模块优先读取 scripts 生成的 data/maintenance_seed.json，
+保证应用、检查脚本与种子文件用的是同一份数据；文件缺失时回退到内置示例。
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 from app.seed import SEED_ROWS
+
+MAINTENANCE_SEED_FILE = Path(__file__).resolve().parents[1] / "data" / "maintenance_seed.json"
 
 
 class Store:
@@ -14,6 +20,18 @@ class Store:
         self._tables: dict[str, list[dict[str, Any]]] = {
             name: [dict(row) for row in rows] for name, rows in SEED_ROWS.items()
         }
+        self._load_maintenance_seed()
+
+    def _load_maintenance_seed(self) -> None:
+        """定期检修以生成的种子文件为准；文件缺失或损坏时回退到内置示例数据。"""
+        if not MAINTENANCE_SEED_FILE.exists():
+            return
+        try:
+            rows = json.loads(MAINTENANCE_SEED_FILE.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return
+        if isinstance(rows, list):
+            self._tables["maintenance"] = [dict(row) for row in rows]
 
     def module_names(self) -> list[str]:
         return sorted(self._tables)
